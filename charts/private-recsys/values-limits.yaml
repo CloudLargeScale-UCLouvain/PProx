@@ -1,0 +1,42 @@
+proxy-sgx:
+  resources:
+    requests:
+      cpu: "1"
+      memory: "0.5Gi"
+    limits:
+      cpu: "1"
+      memory: "0.5Gi"
+
+harness:
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "1"
+      memory: "4Gi"
+
+spark:
+  worker:
+    replicaCount: 1
+    resources:
+      requests:
+        memory: "8Gi"
+
+mongo:
+  resources:
+    requests:
+      cpu: "0.5"
+      memory: "2Gi"
+    limits:
+      cpu: "0.5"
+      memory: "2Gi"
+
+elastic:
+  resources:
+    requests:
+      cpu: "1"
+      memory: "4Gi"
+    limits:
+      cpu: "1"
+      memory: "4Gi"

@@ -1,0 +1,59 @@
+# Use root/example as user/password credentials
+version: '3.1'
+
+services:
+
+  mongo:
+    image: bitnami/mongodb:4.0.9-debian-9-r25
+    restart: always
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8082:8081
+    depends_on:
+      - mongo
+  elasticsearch:
+    image: elasticsearch:5.6-alpine
+    restart: always
+    ports:
+      - 9200:9200
+      - 9300:9300
+    environment:
+      discovery.type: single-node
+
+  spark-master:
+    image: actionml/spark:2.3.3
+    command: master
+    ports:
+      - 8180:8080
+
+  spark-worker:
+    image: actionml/spark:2.3.3
+    command: worker spark://spark-master:7077
+    depends_on:
+      - spark-master
+#    ports:
+#      - 8181:8081
+    environment:
+      - SPARK_WORKER_MEMORY=8g
+
+  harness:
+    image: actionml/harness:develop-2020-03-11
+    restart: always
+    ports:
+      - 9090:9090
+    environment:
+      HARNESS_URI: http://0.0.0.0:9090
+      MONGO_URI: mongodb://mongo:27017
+      ELASTICSEARCH_URI: http://elasticsearch:9200
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      - mongo
+      - elasticsearch
+      - spark-master

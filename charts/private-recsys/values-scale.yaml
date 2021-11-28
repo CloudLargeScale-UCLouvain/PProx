@@ -1,0 +1,12 @@
+harness:
+  replicaCount: 2
+
+mongo:
+  replicaSet:
+    replicas:
+      secondary: 2
+elastic:
+  replicas: 2
+
+proxy-sgx:
+  replicaCount: 2

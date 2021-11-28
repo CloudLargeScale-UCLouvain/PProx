@@ -1,0 +1,64 @@
+FROM sebvaucher/sgx-base AS builder-noSGX
+WORKDIR /usr/src/app/
+RUN /bin/bash -c 'apt-get update -y && apt-get install -y libssl-dev g++'
+COPY App/* ./
+COPY Enclave/* ./
+COPY Include/* ./
+
+# Remove SGX-related headers
+RUN /bin/bash -c 'sed -i "/include \"Enclave_u.h\"/d" App.cpp'
+RUN /bin/bash -c 'sed -i "/include \"sgx_urts.h\"/d" App.cpp'
+RUN /bin/bash -c 'sed -i "/include \"sgx_eid.h\"/d" App.h'
+RUN /bin/bash -c 'sed -i "/include \"Enclave_u.h\"/d" common_socket.cpp'
+RUN /bin/bash -c 'sed -i "/include \"Enclave_t.h\"/d" Enclave.cpp'
+RUN /bin/bash -c 'sed -i "/include \"err_handling.h\"/d" Enclave.cpp'
+RUN /bin/bash -c 'sed -i "/include \"Enclave_u.h\"/d" server.cpp'
+
+# Remove SGX-related calls
+RUN /bin/bash -c 'sed -i "/sgx_enclave_id_t/d" App.cpp'
+RUN /bin/bash -c 'sed -i "/initialize_enclave();/d" App.cpp'
+RUN /bin/bash -c 'sed -i "/sgx_destroy_enclave(global_eid);/d" App.cpp'
+RUN /bin/bash -c 'sed -i "/sgx_enclave_id_t/d" App.h'
+RUN /bin/bash -c 'sed -i "/sgx_enclave_id_t/d" Enclave.cpp'
+RUN /bin/bash -c 'sed -i "/sgx_enclave_id_t/d" server.cpp'
+
+# Comment SGX errors
+RUN /bin/bash -c 'sed -i "s/typedef struct _sgx_errlist_t {/\/\*typedef struct _sgx_errlist_t {/g" App.cpp'
+RUN /bin/bash -c 'sed -i "s/int SGX_CDECL/int SGX_CDECL\*\/int/g" App.cpp'
+
+# Remove SGX eid from ecalls
+RUN /bin/bash -c 'sed -i "s/ecall_init(global_eid, /ecall_init(/g" App.cpp'
+RUN /bin/bash -c 'sed -i "s/ecall_proxy(global_eid, /ecall_proxy(/g" server.cpp'
+
+# Create Enclave.h
+RUN /bin/bash -c 'echo "void ecall_proxy(int csock, char *buff, size_t size, char *buff_final, size_t *size2, int ifreq);" >> Enclave.h'
+RUN /bin/bash -c 'echo "void ecall_init(int debug, int proxy_type, int enable_encryption, int enable_items_decr, char *outAddr, size_t size);" >> Enclave.h'
+RUN /bin/bash -c 'sed -i "1s/^/\#include \"Enclave.h\"\n/" App.cpp'
+RUN /bin/bash -c 'sed -i "1s/^/\#include \"Enclave.h\"\n/" server.cpp'
+
+# Fix
+RUN /bin/bash -c 'sed -i "s/std::memcpy/memcpy/g" Enclave.cpp'
+
+# Add string headers
+RUN /bin/bash -c 'sed -i "1s/^/\#include <string.h>\n/" App.cpp'
+RUN /bin/bash -c 'sed -i "1s/^/\#include <string.h>\n/" common_socket.cpp'
+RUN /bin/bash -c 'sed -i "1s/^/\#include <string.h>\n/" crypto_fct.h'
+RUN /bin/bash -c 'sed -i "1s/^/\#include <string>\n/" Enclave.h'
+
+#Compile
+RUN /bin/bash -c 'g++ -o app *.cpp -std=c++11 -lcrypto -lpthread -Wall'
+
+FROM sebvaucher/sgx-base
+WORKDIR /usr/src/app/
+COPY --from=builder-noSGX /usr/src/app/app .
+
+ENV PROXY_TYPE 0
+ENV ENABLE_ENCRYPTION 0
+ENV ENABLE_ITEMS_DECR 1
+ENV NB_THREADS 2
+ENV BUFFER_SHUFFLING 1
+ENV EPOLL_SIZE 32
+ENV DEBUG 0
+
+CMD [ "bash", "-c" ,"./app"]
+

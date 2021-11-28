@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ include "spark-harness.fullname" . }}-master-svc"
+  labels:
+{{ include "spark-harness.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 7077
+      targetPort: cluster
+      name: cluster
+  selector:
+    app.kubernetes.io/name: "{{ include "spark-harness.name" . }}-master"
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: master

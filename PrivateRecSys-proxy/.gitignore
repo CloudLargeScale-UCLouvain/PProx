@@ -1,0 +1,23 @@
+#object file
+*.o
+
+#library
+*.a
+
+#share object
+*.so
+*.so.*
+
+#generated proxy
+*_u.c
+*_u.h
+*_t.c
+*_t.h
+
+#output files
+app
+.config_HW_DEBUG_x64
+
+#node
+/node_modules/
+

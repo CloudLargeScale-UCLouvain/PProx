@@ -1,0 +1,152 @@
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: locust-ur
+data:
+  scale-harness.sh: |-
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl; chmod +x ./kubectl
+    ./kubectl scale sts recsys-harness   --replicas={{ .Values.harnessReplicas }} --timeout=60s
+    sleep 30
+
+  create-ur.sh: |-
+    HARNESS_HOST="{{ .Values.targetHost }}"
+    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token);
+    IPS=$(curl "https://kubernetes.default.svc/api/v1/namespaces/default/endpoints?fieldSelector=metadata.name%3Drecsys-harness" --silent      --header "Authorization: Bearer $TOKEN" --insecure  | jq -rM ".items[].subsets[].addresses[].ip")
+    curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.18.0/bin/linux/amd64/kubectl; chmod +x ./kubectl
+    
+    curl -d "@ur.json" -X POST  -H "Content-Type: application/json" {{ .Values.targetFirstHost }}/engines/
+    sleep 30
+
+  train-and-wait.sh: |-
+    HARNESS_HOST="{{ .Values.targetFirstHost }}"
+    curl -X POST $HARNESS_HOST/engines/sgx_ur/jobs
+    max=$1
+    i=0
+    while [ "$i" -le "$max" ]; do
+
+      response=$(curl --silent  $HARNESS_HOST/engines/sgx_ur/ |jq -r '.jobStatuses[0].status.name')
+      if [ $response == 'successful' ]; then
+        echo "Training is over"
+        break
+      fi
+      sleep 1
+      i=$(( i + 1 ))
+      echo "Waiting : $i - $response"
+    done
+
+  test.sh: |-
+    HARNESS_HOST="{{ .Values.targetHost }}"
+    curl -d "{\"user\":\"1\"}" -H "Content-Type: application/json" -X POST $HARNESS_HOST/engines/sgx_ur/queries
+  
+  check-train-ok.sh: |-
+    HARNESS_HOST="{{ .Values.targetFirstHost }}"
+    response=$(curl -d "{\"user\":\"test\"}" --silent -H "Content-Type: application/json" -X POST $HARNESS_HOST/engines/sgx_ur/queries)
+    if [[ "$response" == "{\"result\":[]}"  ||  "$response" == "There was an internal server error." ]]; then
+      echo "Empty result, training has failed."
+      exit 1
+    fi
+    echo "Training OK : $response."
+    
+
+  ur.json: |-
+    {
+      "engineId": "sgx_ur",
+      "engineFactory": "com.actionml.engines.ur.UREngine",
+      "comment": "spark://spark-api:7077",
+      "comment": "elasticsearch-client",
+      "sparkConf": {
+        "master": "spark://recsys-spark-harness-master-0:7077",
+        "spark.submit.deployMode": "cluster",
+        "spark.driver.memory": "4g",
+        "spark.driver.bind":"recsys-harness-0",
+        "spark.executor.memory": "8g",
+        "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+        "spark.kryo.registrator": "org.apache.mahout.sparkbindings.io.MahoutKryoRegistrator",
+        "spark.kryo.referenceTracking": "false",
+        "spark.kryoserializer.buffer": "300m",
+        "es.index.auto.create": "true",
+        "spark.es.index.auto.create": "true",
+        "es.nodes": "elasticsearch-master",
+        "spark.es.nodes": "elasticsearch-master",
+        "es.nodes.wan.only": "true",
+        "spark.es.nodes.wan.only": "true"
+      },
+      "algorithm": {
+        "indicators": [
+          {
+            "name": "film"
+          }
+        ],
+        "seed" : {{ .Values.seedUR }}
+      }
+    }
+
+  download-train-dataset.sh: |-
+    curl http://manager-jupyter.manager:8888/api/contents/work/manager-scripts/datasets/{{ .Values.datasetName }}/init1.csv |jq -r '.content' > /dataset/init1.csv
+    head /dataset/init1.csv
+
+  download-test-dataset.sh: |-
+    curl http://manager-jupyter.manager:8888/api/contents/work/manager-scripts/datasets/{{ .Values.datasetName }}/test1.csv |jq -r '.content' > /dataset/test1.csv
+    head /dataset/test1.csv
+
+  generate-small-dataset.py: |-
+    #!/usr/bin/python3
+    from io import BytesIO
+    from zipfile import ZipFile
+    from urllib.request import urlopen
+    import csv
+    import os
+    import json
+    from datetime import datetime
+    import time
+    
+    maxTS = 1420070400 #01/01/2015 0:00 #maxTS = 1427784002
+    minTS = 1388534400 #01/01/2014 0:00 #minTS = 789652004
+    trainingPercent = 16.67 # January + February as training
+    filename_init = '/dataset/init1.csv'
+    filename_test = '/dataset/test1.csv'
+    os.makedirs("/dataset/", exist_ok=True)
+    
+    print('Downloading...')
+    #resp = urlopen("http://files.grouplens.org/datasets/movielens/{{ .Values.datasetName }}.zip")
+    resp = urlopen("http://files.grouplens.org/datasets/movielens/{{ .Values.datasetName }}.zip")
+    zipfile = ZipFile(BytesIO(resp.read()))
+    print('Extracting...')
+    zipfile.extract('{{ .Values.datasetName }}/ratings.csv') # userId,movieId,rating,timestamp
+    
+    print('Converting to list...')
+    reader = csv.DictReader(open('{{ .Values.datasetName }}/ratings.csv', newline=''))
+    ratings = list(reader)
+    print('Subsampling ratings...')
+    ratings = [rating for rating in ratings if (int(rating['timestamp']) > minTS and int(rating['timestamp']) < maxTS)]
+    print('Sorting ratings...')
+    ratings = sorted(ratings, key=lambda k:int(k['timestamp']))
+    print('Writing...')
+    #fieldnames = ["body"]
+    fieldnames = ['userId','movieId']
+    with open(filename_init, 'w') as csvfile_init:
+    	with open(filename_test, 'w') as csvfile_test:
+    		writer_init = csv.DictWriter(csvfile_init, fieldnames=fieldnames, extrasaction='ignore')
+    		writer_test = csv.DictWriter(csvfile_test, fieldnames=fieldnames, extrasaction='ignore')
+    		#writer_init.writeheader()
+    		#writer_test.writeheader()
+    		for item in ratings:
+    			print(item)            
+    			if int(item['timestamp']) < minTS + ((maxTS - minTS) * (trainingPercent / 100)):
+    				data={}
+    				data['event'] = 'film'
+    				data['entityType'] = 'user'
+    				data['entityId'] = item["userId"]
+    				data['targetEntityType'] = 'item'
+    				data['targetEntityId'] = item["movieId"]
+    				data['eventTime'] = datetime.utcfromtimestamp(time.time() / 1e9).isoformat(timespec="milliseconds") + "Z"
+    				row = {"body":json.dumps(data)}
+    				writer_init.writerow(item)
+    			else:
+    				data={}
+    				data["user"] = item["userId"]
+    				row = {"body":json.dumps(data)}
+    				writer_test.writerow(item)
+    print('Done.')

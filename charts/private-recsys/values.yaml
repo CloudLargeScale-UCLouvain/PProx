@@ -1,0 +1,129 @@
+# Default values for private-recsys.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# You MUST defined hostAddress with the manager address
+#hostAddress: 10-0-0-19.nip.io
+
+harness:
+  replicaCount: 1
+
+mongo:
+  replicaSet:
+    enabled: true
+    replicas:
+      secondary: 1
+    useHostnames: true
+
+# VERY IMPORTANT : put cluster name here (or error not master and slaveok=false happens)
+  clusterDomain: cluster.local 
+
+  persistence:
+    enabled: false
+  usePassword: false
+
+# use production values
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+#  usePassword: true
+#  mongodbRootPassword: root
+  image:
+    #tag: 4.0.12-debian-9-r7
+    tag: 4.0.9-debian-9-r25
+  nodeSelector:
+    tier: mongo
+
+elastic:
+  imageTag: 5.6.16
+  esMajorVersion: 5
+  minimumMasterNodes: 1
+  antiAffinity: soft
+#  volumeClaimTemplate:
+#    resources:
+#      requests:
+#        storage: 5Gi
+#    storageClassName: "local-storage"
+  replicas: 1
+  persistence:
+    enabled: false
+  clusterHealthCheckParams: "wait_for_status=green&timeout=180s"
+  esConfig:
+    elasticsearch.yml: |
+      xpack.security.enabled: false
+  nodeSelector:
+    tier: elastic
+
+proxy-sgx:
+  replicaCount: 1
+  bufferShuffling: 1
+  responseTimeout: 999999
+  nodeSelector:
+    tier: pprox
+  resources:
+    limits:
+#      cpu: 1000m
+      memory: 4096Mi
+    requests:
+#      cpu: 1000m
+      memory: 4096Mi
+
+harness:
+  nodeSelector:
+    tier: harness
+
+image:
+  repository: nginx
+  tag: stable
+  pullPolicy: Always
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths: []
+
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

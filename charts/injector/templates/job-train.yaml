@@ -1,0 +1,51 @@
+{{- if .Values.harness }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ include "injector.fullname" . }}-locust-train"
+  labels:
+{{ include "injector.labels" . | indent 4 }}
+    app.kubernetes.io/name: "{{ include "injector.name" . }}-locust-train"
+    experiment: {{ .Values.experiment | default "test" }}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "{{ include "injector.name" . }}-locust-train"
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      restartPolicy: "Never"
+      initContainers:
+      - name: wait-for-sgx-proxy-2
+        image: groundnuty/k8s-wait-for:0.1
+        args: [ "job", "-lapp.kubernetes.io/name={{ include "injector.name" . }}-locust-init" ]
+      containers:
+        - name: locust-train
+          image: "giantswarm/tiny-tools"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: config-volume
+            mountPath: /train-and-wait.sh
+            subPath: train-and-wait.sh
+          command: ["sh", "-c", "/train-and-wait.sh 120"]
+      volumes:
+        - name: config-volume
+          configMap:
+            name: locust-ur
+            defaultMode: 0744
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+{{- end }}

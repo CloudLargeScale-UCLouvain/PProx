@@ -1,0 +1,25 @@
+{
+  "name": "http-injector",
+  "version": "1.0.0",
+  "description": "HtTP injector",
+  "main": "index.js",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "fs": "0.0.1-security",
+    "loadtest": "^3.0.8",
+    "morgan": "^1.9.1",
+    "path": "^0.12.7",
+    "fluent-logger": "3.3.1",
+    "csv-parser": "2.3.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Laurent Réveillère",
+  "contributors": [
+    "Guillaume Rosinosky <guillaumerosinosky@yahoo.fr> (https://cloudlargescale-uclouvain.github.io/Guillaume_Rosinosky)"
+  ],
+  "license": "ISC"
+}

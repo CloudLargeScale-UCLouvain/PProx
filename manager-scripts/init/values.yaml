@@ -1,0 +1,33 @@
+argo:
+    install: false
+mongoExpress:
+  nodeSelector:
+    tier: manager
+prometheus:
+  install: false
+  alertmanager:
+    alertmanagerSpec:
+      nodeSelector:
+        tier: efk
+  prometheus:
+    prometheusSpec:
+      scrape_interval: 15s
+      ## How long until a scrape request times out
+      ##
+      scrape_timeout: 30s
+      ## How frequently to evaluate rules
+      ##
+      evaluation_interval: 15s
+      nodeSelector:
+        tier: efk
+  prometheusOperator:
+    nodeSelector:
+      tier: efk
+  grafana:
+    nodeSelector:
+      tier: efk
+  kube-state-metrics:
+    nodeSelector:
+      tier: efk
+  
+hostAddress: 10-0-0-33.nip.io    

@@ -1,0 +1,5 @@
+duration: 60
+clients: 10
+replicaCount: 2
+targetHost: "http://recsys-proxy-sgx-1:8080"
+name: test-scale

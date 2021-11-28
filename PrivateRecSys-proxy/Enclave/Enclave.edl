@@ -1,0 +1,15 @@
+enclave {
+
+	from "sgx_tsgxssl.edl" import *;
+	
+	trusted {
+		public void ecall_proxy(int csock, [in,size=size] char *buff, size_t size, [out,size=4096] char *buff_final, [out] size_t *size2, int ifreq);
+		public void ecall_init(int debug, int proxy_type, int enable_encryption, int enable_items_decr, [in,size=size] char *outAddr, size_t size);
+	};
+
+	untrusted {
+		void ocall_print_string([in,string] const char *str);
+	};
+
+};
+

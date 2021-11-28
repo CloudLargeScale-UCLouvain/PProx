@@ -1,0 +1,18 @@
+dependencies:
+- name: mongodb
+  repository: https://charts.bitnami.com/bitnami
+  version: 4.10.1
+- name: prometheus-operator
+  repository: https://charts.helm.sh/stable
+  version: 8.7.0
+- name: argo
+  repository: https://argoproj.github.io/argo-helm
+  version: 0.8.5
+- name: loki-stack
+  repository: https://grafana.github.io/loki/charts
+  version: 2.0.2
+- name: minio
+  repository: https://helm.min.io/
+  version: 5.0.32
+digest: sha256:72a138605f6f50a3f1c70e09e2fdb76bd3cc453196df3beb5e589c351c1f98e7
+generated: "2021-01-21T17:43:45.96171387Z"

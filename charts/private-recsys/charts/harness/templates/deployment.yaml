@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "harness.fullname" . }}
+  labels:
+{{ include "harness.labels" . | indent 4 }}
+    experiment: {{ .Values.experiment | default "test" }}
+spec:
+  serviceName: recsys-harness-0
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "harness.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "harness.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      initContainers:
+      - name: wait-for-mongo
+        image: groundnuty/k8s-wait-for:0.1
+        args: [ "pod", "-lapp=mongo" ]
+      - name: wait-for-elastic
+        image: groundnuty/k8s-wait-for:0.1
+        args: [ "pod", "-lapp=elasticsearch-master" ]
+      - name: wait-for-spark
+        image: groundnuty/k8s-wait-for:0.1
+        args: [ "pod", "-lapp.kubernetes.io/name=spark-harness" ]
+      hostname: "recsys-harness-0"
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: MONGO_URI
+              value: "mongodb://{{ .Release.Name }}-{{ .Values.mongoHost }}:27017"
+            - name: HARNESS_URI 
+              value: "http://0.0.0.0:9090"
+            - name: ELASTICSEARCH_URI
+              value: http://{{ default "localhost" .Values.elasticsearchRestHost }}:9200
+            - name: HARNESS_MAX_CONNECTIONS
+              value: "{{ .Values.harnessMaxConnections }}"
+            - name: HARNESS_MAX_REQUESTS
+              value: "{{ .Values.harnessMaxRequests }}"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

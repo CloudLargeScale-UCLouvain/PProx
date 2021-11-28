@@ -1,0 +1,50 @@
+version: '3.7'
+services:
+  jupyter:
+    build:
+      context: ./harness-recommender/notebooks
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/harness-jupyter:registry  
+  harness-locust-cli:
+    build:
+      context: ./harness-recommender/harness-locust-cli
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/harness-locust-cli:registry  
+  fluentd:
+    build: 
+      context: ./harness-recommender/fluentd-locust
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/fluentd-locust:registry 
+  sgx-proxy-nosgx:
+    build:
+      context: ./PrivateRecSys-proxy
+      dockerfile: Dockerfile-noSGX
+      network: host
+    image: localhost:32000/sgx-proxy-nosgx:registry
+  sgx-proxy:
+    build:
+      context: ./PrivateRecSys-proxy
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/sgx-proxy:registry
+  node-injector:
+    build:
+      context: ./harness-recommender/http-injector
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/node-injector:registry  
+  stub-recommender:
+    build:
+      context: ./stub/stub-recommender-nginx
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/stub-recommender-nginx:registry        
+  harness-locust-cli-events:
+    build:
+      context: ./harness-recommender/harness-locust-cli
+      dockerfile: Dockerfile
+      network: host
+    image: localhost:32000/harness-locust-cli:registry    

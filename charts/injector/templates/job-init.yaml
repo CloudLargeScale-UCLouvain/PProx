@@ -1,0 +1,100 @@
+{{- if .Values.harness }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ include "injector.fullname" . }}-locust-init"
+  labels:
+{{ include "injector.labels" . | indent 4 }}
+    app.kubernetes.io/name: "{{ include "injector.name" . }}-locust-init"
+    experiment: {{ .Values.experiment | default "test" }}
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "{{ include "injector.name" . }}-locust-init"
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      restartPolicy: "Never"
+      initContainers:
+      - name: wait-for-sgx-proxy-2
+        image: groundnuty/k8s-wait-for:0.1
+        args: [ "pod", "-lapp.kubernetes.io/name=proxy-sgx-2" ]
+      - name: wait-for-sgx-proxy-1
+        image: groundnuty/k8s-wait-for:0.1
+        args: [ "pod", "-lapp.kubernetes.io/name=proxy-sgx-1" ]
+      - name: create-engine
+        image: giantswarm/tiny-tools
+        command: ["sh", "-c", "/create-ur.sh"]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /create-ur.sh
+          subPath: create-ur.sh
+        - name: config-volume
+          mountPath: /ur.json
+          subPath: ur.json
+      - name: load-dataset
+        image: giantswarm/tiny-tools
+        command: ["sh", "/download-train-dataset.sh"]
+        volumeMounts:
+        - name: dataset-volume
+          mountPath: /dataset
+        - name: config-volume
+          mountPath: /download-train-dataset.sh
+          subPath: download-train-dataset.sh
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "localhost:32000/harness-locust-cli:registry"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: URL_BASE
+              value: "{{ .Values.targetHost }}/engines/sgx_ur/events"
+            - name: LOCUST_TARGET_HOST
+              value: "{{ .Values.targetHost }}"
+            - name: LOCUST_FILE
+              value: "/locust/locustfiles/test-events.py"
+            - name: LOCUST_OPTS
+              value: "--no-web --clients=10 --hatch-rate=10 --run-time=60s --csv=test"
+            - name: FLUENTD_HOST
+              value: ""
+            - name: XP_NAME
+              value: "{{ .Values.name }}"
+            - name: NB_REQUESTS
+              value: "10"
+            - name: DURATION
+              value: "60"
+            - name: ENABLE_ENCRYPTION
+              value: "{{ .Values.enableEncryption }}"
+            - name: CONCURRENCY
+              value: "10"
+            - name: SEED
+              value: "{{ .Values.seed }}"
+            - name: CSV_BODY
+              value: "/dataset/init1.csv"
+            - name: DEBUG
+              value: "1"
+          volumeMounts:
+          - name: dataset-volume
+            mountPath: /dataset
+      volumes:
+        - name: dataset-volume
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: locust-ur
+            defaultMode: 0744
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+{{- end }}

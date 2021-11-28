@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ include "spark-harness.fullname" . }}-master-0"
+  labels:
+{{ include "spark-harness.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: "{{ include "spark-harness.name" . }}"
+    app.kubernetes.io/component: "master"
+    app.kubernetes.io/instance: {{ .Release.Name }}

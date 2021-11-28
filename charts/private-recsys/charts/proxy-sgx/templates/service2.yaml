@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "proxy-sgx.fullname" . }}-2
+  labels:
+{{ include "proxy-sgx.labels" . | indent 4 }}
+    app.kubernetes.io/name: {{ include "proxy-sgx.name" . }}-2
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ include "proxy-sgx.name" . }}-2
+    app.kubernetes.io/instance: {{ .Release.Name }}
